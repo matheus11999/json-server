@@ -12,28 +12,32 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static('public'));
 
-// Arquivos de dados
-const PRODUTOS_FILE = path.join(__dirname, 'data', 'produtos.json');
-const PAUSADOS_FILE = path.join(__dirname, 'data', 'pausados.json');
+// --- Arquivos de Dados ---
+const DATA_DIR = path.join(__dirname, 'data');
+const PRODUTOS_FILE = path.join(DATA_DIR, 'produtos.json');
+const USUARIOS_FILE = path.join(DATA_DIR, 'usuarios.json');
 
-// Criar diretório data se não existir
-if (!fs.existsSync(path.join(__dirname, 'data'))) {
-  fs.mkdirSync(path.join(__dirname, 'data'));
+// --- Inicialização ---
+// Criar diretório 'data' se não existir
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR);
 }
 
-// Inicializar arquivos se não existirem
+// Inicializar arquivo de produtos se não existir
 if (!fs.existsSync(PRODUTOS_FILE)) {
   fs.writeFileSync(PRODUTOS_FILE, JSON.stringify([
     { "id": 1, "nome": "Tela A20s", "quantidade": 10, "valor": 200 },
-    { "id": 2, "nome": "Bateria J7", "quantidade": 5, "valor": 120 }
+    { "id": 2, "nome": "Bateria J7", "quantidade": 5, "valor": 120 },
+    { "id": 3, "nome": "frontal a50", "quantidade": 1, "valor": 180 }
   ], null, 2));
 }
 
-if (!fs.existsSync(PAUSADOS_FILE)) {
-  fs.writeFileSync(PAUSADOS_FILE, JSON.stringify({}, null, 2));
+// Inicializar arquivo de usuários se não existir
+if (!fs.existsSync(USUARIOS_FILE)) {
+  fs.writeFileSync(USUARIOS_FILE, JSON.stringify({}, null, 2));
 }
 
-// Funções auxiliares
+// --- Funções Auxiliares ---
 function lerArquivo(arquivo) {
   try {
     return JSON.parse(fs.readFileSync(arquivo, 'utf8'));
@@ -53,7 +57,9 @@ function salvarArquivo(arquivo, dados) {
   }
 }
 
-// ===== ROTAS PRODUTOS =====
+// =============================
+// ===== ROTAS DE PRODUTOS =====
+// =============================
 
 // GET /api/produtos - Listar todos os produtos
 app.get('/api/produtos', (req, res) => {
@@ -61,187 +67,107 @@ app.get('/api/produtos', (req, res) => {
   res.json(produtos);
 });
 
-// GET /api/produtos/:id - Buscar produto por ID
-app.get('/api/produtos/:id', (req, res) => {
-  const produtos = lerArquivo(PRODUTOS_FILE);
-  const produto = produtos.find(p => p.id === parseInt(req.params.id));
-  
-  if (!produto) {
-    return res.status(404).json({ erro: 'Produto não encontrado' });
-  }
-  
-  res.json(produto);
+// =============================
+// ===== ROTAS DE USUÁRIOS =====
+// =============================
+
+// GET /api/usuarios - Listar todos os usuários
+app.get('/api/usuarios', (req, res) => {
+  const usuarios = lerArquivo(USUARIOS_FILE);
+  res.json(usuarios);
 });
 
-// POST /api/produtos - Criar novo produto
-app.post('/api/produtos', (req, res) => {
-  const { nome, quantidade, valor } = req.body;
-  
-  if (!nome || quantidade === undefined || valor === undefined) {
-    return res.status(400).json({ erro: 'Nome, quantidade e valor são obrigatórios' });
-  }
-  
-  const produtos = lerArquivo(PRODUTOS_FILE);
-  const novoId = produtos.length > 0 ? Math.max(...produtos.map(p => p.id)) + 1 : 1;
-  
-  const novoProduto = {
-    id: novoId,
-    nome: nome.trim(),
-    quantidade: parseInt(quantidade),
-    valor: parseFloat(valor)
-  };
-  
-  produtos.push(novoProduto);
-  
-  if (salvarArquivo(PRODUTOS_FILE, produtos)) {
-    res.status(201).json(novoProduto);
-  } else {
-    res.status(500).json({ erro: 'Erro ao salvar produto' });
-  }
-});
-
-// PUT /api/produtos/:id - Atualizar produto
-app.put('/api/produtos/:id', (req, res) => {
-  const { nome, quantidade, valor } = req.body;
-  const produtos = lerArquivo(PRODUTOS_FILE);
-  const index = produtos.findIndex(p => p.id === parseInt(req.params.id));
-  
-  if (index === -1) {
-    return res.status(404).json({ erro: 'Produto não encontrado' });
-  }
-  
-  if (nome !== undefined) produtos[index].nome = nome.trim();
-  if (quantidade !== undefined) produtos[index].quantidade = parseInt(quantidade);
-  if (valor !== undefined) produtos[index].valor = parseFloat(valor);
-  
-  if (salvarArquivo(PRODUTOS_FILE, produtos)) {
-    res.json(produtos[index]);
-  } else {
-    res.status(500).json({ erro: 'Erro ao atualizar produto' });
-  }
-});
-
-// DELETE /api/produtos/:id - Deletar produto
-app.delete('/api/produtos/:id', (req, res) => {
-  const produtos = lerArquivo(PRODUTOS_FILE);
-  const index = produtos.findIndex(p => p.id === parseInt(req.params.id));
-  
-  if (index === -1) {
-    return res.status(404).json({ erro: 'Produto não encontrado' });
-  }
-  
-  const produtoRemovido = produtos.splice(index, 1)[0];
-  
-  if (salvarArquivo(PRODUTOS_FILE, produtos)) {
-    res.json({ mensagem: 'Produto removido com sucesso', produto: produtoRemovido });
-  } else {
-    res.status(500).json({ erro: 'Erro ao remover produto' });
-  }
-});
-
-// ===== ROTAS USUÁRIOS PAUSADOS =====
-
-// GET /api/pausados - Listar todos os usuários pausados
-app.get('/api/pausados', (req, res) => {
-  const pausados = lerArquivo(PAUSADOS_FILE);
-  res.json(pausados);
-});
-
-// GET /api/pausados/:numero - Verificar se usuário está pausado
-app.get('/api/pausados/:numero', (req, res) => {
-  const pausados = lerArquivo(PAUSADOS_FILE);
+// GET /api/usuarios/:numero - Buscar ou criar usuário
+app.get('/api/usuarios/:numero', (req, res) => {
+  const usuarios = lerArquivo(USUARIOS_FILE);
   const numero = req.params.numero;
-  
-  if (pausados[numero]) {
-    res.json({ pausado: true, dados: pausados[numero] });
+  const { nome = 'Usuario' } = req.query; // Pega o nome da query string, se houver
+
+  if (usuarios[numero]) {
+    // Usuário existe, atualiza o último contato e retorna
+    usuarios[numero].ultimoContato = new Date().toISOString();
+    salvarArquivo(USUARIOS_FILE, usuarios);
+    res.json(usuarios[numero]);
   } else {
-    res.json({ pausado: false });
+    // Usuário não existe, cria um novo
+    const novoUsuario = {
+      numero: numero,
+      nome: nome,
+      pausado: false,
+      aceitaMensagens: true,
+      primeiroContato: new Date().toISOString(),
+      ultimoContato: new Date().toISOString(),
+      tags: []
+    };
+    usuarios[numero] = novoUsuario;
+    salvarArquivo(USUARIOS_FILE, usuarios);
+    res.status(201).json(novoUsuario); // 201 Created
   }
 });
 
-// POST /api/pausados - Pausar usuário
-app.post('/api/pausados', (req, res) => {
-  const { numero, motivo = 'Pausado manualmente' } = req.body;
-  
-  if (!numero) {
-    return res.status(400).json({ erro: 'Número é obrigatório' });
-  }
-  
-  const pausados = lerArquivo(PAUSADOS_FILE);
-  
-  pausados[numero] = {
-    numero: numero,
-    motivo: motivo,
-    pausadoEm: new Date().toISOString(),
-    pausadoPor: 'admin'
-  };
-  
-  if (salvarArquivo(PAUSADOS_FILE, pausados)) {
-    res.status(201).json({ mensagem: 'Usuário pausado com sucesso', dados: pausados[numero] });
-  } else {
-    res.status(500).json({ erro: 'Erro ao pausar usuário' });
-  }
-});
-
-// DELETE /api/pausados/:numero - Reativar usuário
-app.delete('/api/pausados/:numero', (req, res) => {
+// PUT /api/usuarios/:numero - Atualizar dados do usuário
+app.put('/api/usuarios/:numero', (req, res) => {
+  const usuarios = lerArquivo(USUARIOS_FILE);
   const numero = req.params.numero;
-  const pausados = lerArquivo(PAUSADOS_FILE);
-  
-  if (!pausados[numero]) {
-    return res.status(404).json({ erro: 'Usuário não está pausado' });
+  const { nome, pausado, aceitaMensagens } = req.body;
+
+  if (!usuarios[numero]) {
+    return res.status(404).json({ erro: 'Usuário não encontrado' });
+  }
+
+  // Atualiza os campos fornecidos
+  if (nome !== undefined) {
+    usuarios[numero].nome = nome;
+  }
+  if (pausado !== undefined) {
+    usuarios[numero].pausado = pausado;
+  }
+  if (aceitaMensagens !== undefined) {
+    usuarios[numero].aceitaMensagens = aceitaMensagens;
   }
   
-  const dadosUsuario = pausados[numero];
-  delete pausados[numero];
-  
-  if (salvarArquivo(PAUSADOS_FILE, pausados)) {
-    res.json({ mensagem: 'Usuário reativado com sucesso', dadosAnteriores: dadosUsuario });
+  usuarios[numero].ultimoContato = new Date().toISOString();
+
+  if (salvarArquivo(USUARIOS_FILE, usuarios)) {
+    res.json(usuarios[numero]);
   } else {
-    res.status(500).json({ erro: 'Erro ao reativar usuário' });
+    res.status(500).json({ erro: 'Erro ao atualizar usuário' });
   }
 });
 
-// ===== ROTAS ESPECIAIS PARA N8N =====
 
-// GET /produtos - Compatibilidade com jsonkeeper (para n8n)
+// =============================
+// ===== ROTAS LEGADAS (N8N) =====
+// =============================
+
+// GET /produtos - Compatibilidade para o n8n não quebrar
 app.get('/produtos', (req, res) => {
   const produtos = lerArquivo(PRODUTOS_FILE);
   res.json(produtos);
 });
 
-// GET /pausados - Compatibilidade simples (para n8n)
-app.get('/pausados', (req, res) => {
-  const pausados = lerArquivo(PAUSADOS_FILE);
-  res.json(pausados);
-});
+// =============================
+// ===== ROTAS DO SERVIDOR =====
+// =============================
 
-// ===== ROTA PRINCIPAL =====
 app.get('/', (req, res) => {
   res.redirect('/admin');
 });
 
-// ===== ROTA DE STATUS =====
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    produtos: lerArquivo(PRODUTOS_FILE).length,
-    pausados: Object.keys(lerArquivo(PAUSADOS_FILE)).length
+    totalProdutos: lerArquivo(PRODUTOS_FILE).length,
+    totalUsuarios: Object.keys(lerArquivo(USUARIOS_FILE)).length
   });
 });
 
+// =============================
 // ===== INICIAR SERVIDOR =====
+// =============================
 app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
-  console.log(`📊 Admin: http://localhost:${PORT}/admin`);
   console.log(`🔗 API Produtos: http://localhost:${PORT}/api/produtos`);
-  console.log(`⏸️  API Pausados: http://localhost:${PORT}/api/pausados`);
-  console.log(`❤️  Health: http://localhost:${PORT}/health`);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('🛑 Servidor sendo encerrado...');
-  process.exit(0);
+  console.log(`👤 API Usuários: http://localhost:${PORT}/api/usuarios`);
 });
