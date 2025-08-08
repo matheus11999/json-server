@@ -3,30 +3,27 @@ const API_BASE = window.location.origin;
 
 // Estado global
 let produtos = [];
-let pausados = {};
+let usuarios = [];
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
     carregarStatus();
     carregarProdutos();
-    carregarPausados();
+    carregarUsuarios();
 });
 
 // Funções auxiliares
 function showTab(tab) {
-    // Atualizar tabs
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelector(`.tab[onclick="showTab('${tab}')"]`).classList.add('active');
     
-    // Atualizar conteúdo
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.getElementById(`${tab}-section`).classList.add('active');
     
-    // Recarregar dados
     if (tab === 'produtos') {
         carregarProdutos();
-    } else if (tab === 'pausados') {
-        carregarPausados();
+    } else if (tab === 'usuarios') {
+        carregarUsuarios();
     }
 }
 
@@ -42,6 +39,7 @@ function showAlert(message, type = 'success') {
 }
 
 function formatarData(isoString) {
+    if (!isoString) return '-';
     const data = new Date(isoString);
     return data.toLocaleString('pt-BR');
 }
@@ -53,10 +51,10 @@ async function carregarStatus() {
         const data = await response.json();
         
         document.getElementById('status-text').textContent = 
-            `✅ Online - ${data.produtos} produtos, ${data.pausados} usuários pausados`;
+            `✅ Online - ${data.totalProdutos} produtos, ${data.totalUsuarios} usuários`;
             
-        document.getElementById('total-produtos').textContent = data.produtos;
-        document.getElementById('total-pausados').textContent = data.pausados;
+        document.getElementById('total-produtos').textContent = data.totalProdutos;
+        document.getElementById('total-usuarios').textContent = data.totalUsuarios;
     } catch (error) {
         document.getElementById('status-text').textContent = '❌ Offline';
         console.error('Erro ao carregar status:', error);
@@ -87,210 +85,81 @@ function renderizarProdutos() {
     tbody.innerHTML = produtos.map(produto => `
         <tr>
             <td>${produto.id}</td>
+            <td>${produto.nome}</td>
+            <td>${produto.quantidade}</td>
+            <td>R$ ${produto.valor.toFixed(2)}</td>
+        </tr>
+    `).join('');
+}
+
+// === USUÁRIOS ===
+
+async function carregarUsuarios() {
+    try {
+        const response = await fetch(`${API_BASE}/api/usuarios`);
+        const data = await response.json();
+        usuarios = Object.values(data); // Converter objeto em array
+        renderizarUsuarios();
+    } catch (error) {
+        showAlert('Erro ao carregar usuários', 'error');
+        console.error('Erro ao carregar usuários:', error);
+    }
+}
+
+function renderizarUsuarios() {
+    const tbody = document.getElementById('usuarios-lista');
+    
+    if (usuarios.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Nenhum usuário encontrado</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = usuarios.sort((a, b) => new Date(b.ultimoContato) - new Date(a.ultimoContato)).map(usuario => `
+        <tr>
+            <td><strong>${usuario.nome}</strong><br><small>${usuario.numero}</small></td>
+            <td>${formatarData(usuario.ultimoContato)}</td>
             <td>
-                <input type="text" value="${produto.nome}" 
-                       onblur="atualizarProduto(${produto.id}, 'nome', this.value)"
-                       style="border: none; background: transparent; width: 100%;">
+                <span class="status-badge ${usuario.pausado ? 'paused' : 'active'}">
+                    ${usuario.pausado ? 'Pausado' : 'Ativo'}
+                </span>
             </td>
             <td>
-                <input type="number" value="${produto.quantidade}" 
-                       onblur="atualizarProduto(${produto.id}, 'quantidade', this.value)"
-                       style="border: none; background: transparent; width: 80px;">
-            </td>
-            <td>
-                R$ <input type="number" value="${produto.valor}" step="0.01"
-                         onblur="atualizarProduto(${produto.id}, 'valor', this.value)"
-                         style="border: none; background: transparent; width: 80px;">
-            </td>
-            <td>
-                <button class="btn btn-danger" onclick="removerProduto(${produto.id})">
-                    🗑️ Remover
-                </button>
+                <label class="switch">
+                    <input type="checkbox" ${!usuario.pausado ? 'checked' : ''} onchange="togglePausado('${usuario.numero}', ${!usuario.pausado})">
+                    <span class="slider round"></span>
+                </label>
             </td>
         </tr>
     `).join('');
 }
 
-async function adicionarProduto() {
-    const nome = document.getElementById('produto-nome').value.trim();
-    const quantidade = parseInt(document.getElementById('produto-quantidade').value);
-    const valor = parseFloat(document.getElementById('produto-valor').value);
-    
-    if (!nome || isNaN(quantidade) || isNaN(valor)) {
-        showAlert('Preencha todos os campos corretamente', 'error');
-        return;
-    }
+async function togglePausado(numero, estaAtivo) {
+    const novoStatusPausado = !estaAtivo;
     
     try {
-        const response = await fetch(`${API_BASE}/api/produtos`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nome, quantidade, valor })
-        });
-        
-        if (response.ok) {
-            showAlert('Produto adicionado com sucesso!');
-            document.getElementById('produto-nome').value = '';
-            document.getElementById('produto-quantidade').value = '';
-            document.getElementById('produto-valor').value = '';
-            carregarProdutos();
-            carregarStatus();
-        } else {
-            const error = await response.json();
-            showAlert(error.erro || 'Erro ao adicionar produto', 'error');
-        }
-    } catch (error) {
-        showAlert('Erro ao adicionar produto', 'error');
-        console.error('Erro:', error);
-    }
-}
-
-async function atualizarProduto(id, campo, valor) {
-    if (valor.trim() === '') return;
-    
-    const dados = {};
-    dados[campo] = campo === 'nome' ? valor : parseFloat(valor) || parseInt(valor);
-    
-    try {
-        const response = await fetch(`${API_BASE}/api/produtos/${id}`, {
+        const response = await fetch(`${API_BASE}/api/usuarios/${numero}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(dados)
+            body: JSON.stringify({ pausado: novoStatusPausado })
         });
         
         if (response.ok) {
-            showAlert('Produto atualizado!');
-            carregarProdutos();
-        } else {
-            showAlert('Erro ao atualizar produto', 'error');
-        }
-    } catch (error) {
-        showAlert('Erro ao atualizar produto', 'error');
-        console.error('Erro:', error);
-    }
-}
-
-async function removerProduto(id) {
-    if (!confirm('Tem certeza que deseja remover este produto?')) return;
-    
-    try {
-        const response = await fetch(`${API_BASE}/api/produtos/${id}`, {
-            method: 'DELETE'
-        });
-        
-        if (response.ok) {
-            showAlert('Produto removido com sucesso!');
-            carregarProdutos();
+            showAlert(`Usuário ${novoStatusPausado ? 'pausado' : 'reativado'} com sucesso!`);
+            carregarUsuarios();
             carregarStatus();
         } else {
-            showAlert('Erro ao remover produto', 'error');
+            showAlert('Erro ao atualizar status do usuário', 'error');
         }
     } catch (error) {
-        showAlert('Erro ao remover produto', 'error');
+        showAlert('Erro ao atualizar status do usuário', 'error');
         console.error('Erro:', error);
     }
 }
 
-// === USUÁRIOS PAUSADOS ===
-
-async function carregarPausados() {
-    try {
-        const response = await fetch(`${API_BASE}/api/pausados`);
-        pausados = await response.json();
-        renderizarPausados();
-    } catch (error) {
-        showAlert('Erro ao carregar usuários pausados', 'error');
-        console.error('Erro ao carregar pausados:', error);
+// Atualizar dados a cada 30 segundos
+setInterval(() => {
+    carregarStatus();
+    if (document.getElementById('usuarios-section').classList.contains('active')) {
+        carregarUsuarios();
     }
-}
-
-function renderizarPausados() {
-    const tbody = document.getElementById('pausados-lista');
-    const pausadosList = Object.values(pausados);
-    
-    if (pausadosList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Nenhum usuário pausado</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = pausadosList.map(pausado => `
-        <tr>
-            <td>
-                <strong>${pausado.numero}</strong>
-                <br><small style="color: #666;">+${pausado.numero}</small>
-            </td>
-            <td>${pausado.motivo || 'Sem motivo especificado'}</td>
-            <td>${formatarData(pausado.pausadoEm)}</td>
-            <td>
-                <button class="btn" onclick="reativarUsuario('${pausado.numero}')">
-                    ▶️ Reativar
-                </button>
-            </td>
-        </tr>
-    `).join('');
-}
-
-async function pausarUsuario() {
-    const numero = document.getElementById('pausar-numero').value.trim();
-    const motivo = document.getElementById('pausar-motivo').value.trim();
-    
-    if (!numero) {
-        showAlert('Informe o número do usuário', 'error');
-        return;
-    }
-    
-    // Validar formato do número (básico)
-    if (!/^\d{10,15}$/.test(numero)) {
-        showAlert('Número deve conter apenas dígitos (10-15 caracteres)', 'error');
-        return;
-    }
-    
-    try {
-        const response = await fetch(`${API_BASE}/api/pausados`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                numero, 
-                motivo: motivo || 'Pausado manualmente pelo admin'
-            })
-        });
-        
-        if (response.ok) {
-            showAlert('Usuário pausado com sucesso!');
-            document.getElementById('pausar-numero').value = '';
-            document.getElementById('pausar-motivo').value = '';
-            carregarPausados();
-            carregarStatus();
-        } else {
-            const error = await response.json();
-            showAlert(error.erro || 'Erro ao pausar usuário', 'error');
-        }
-    } catch (error) {
-        showAlert('Erro ao pausar usuário', 'error');
-        console.error('Erro:', error);
-    }
-}
-
-async function reativarUsuario(numero) {
-    if (!confirm(`Tem certeza que deseja reativar o usuário ${numero}?`)) return;
-    
-    try {
-        const response = await fetch(`${API_BASE}/api/pausados/${numero}`, {
-            method: 'DELETE'
-        });
-        
-        if (response.ok) {
-            showAlert('Usuário reativado com sucesso!');
-            carregarPausados();
-            carregarStatus();
-        } else {
-            showAlert('Erro ao reativar usuário', 'error');
-        }
-    } catch (error) {
-        showAlert('Erro ao reativar usuário', 'error');
-        console.error('Erro:', error);
-    }
-}
-
-// Atualizar status a cada 30 segundos
-setInterval(carregarStatus, 30000);
+}, 30000);
