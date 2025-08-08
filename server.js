@@ -18,21 +18,12 @@ const PRODUTOS_FILE = path.join(DATA_DIR, 'produtos.json');
 const USUARIOS_FILE = path.join(DATA_DIR, 'usuarios.json');
 
 // --- Inicialização ---
-// Criar diretório 'data' se não existir
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR);
 }
-
-// Inicializar arquivo de produtos se não existir
 if (!fs.existsSync(PRODUTOS_FILE)) {
-  fs.writeFileSync(PRODUTOS_FILE, JSON.stringify([
-    { "id": 1, "nome": "Tela A20s", "quantidade": 10, "valor": 200 },
-    { "id": 2, "nome": "Bateria J7", "quantidade": 5, "valor": 120 },
-    { "id": 3, "nome": "frontal a50", "quantidade": 1, "valor": 180 }
-  ], null, 2));
+  fs.writeFileSync(PRODUTOS_FILE, JSON.stringify([], null, 2));
 }
-
-// Inicializar arquivo de usuários se não existir
 if (!fs.existsSync(USUARIOS_FILE)) {
   fs.writeFileSync(USUARIOS_FILE, JSON.stringify({}, null, 2));
 }
@@ -60,8 +51,6 @@ function salvarArquivo(arquivo, dados) {
 // =============================
 // ===== ROTAS DE PRODUTOS =====
 // =============================
-
-// GET /api/produtos - Listar todos os produtos
 app.get('/api/produtos', (req, res) => {
   const produtos = lerArquivo(PRODUTOS_FILE);
   res.json(produtos);
@@ -81,15 +70,13 @@ app.get('/api/usuarios', (req, res) => {
 app.get('/api/usuarios/:numero', (req, res) => {
   const usuarios = lerArquivo(USUARIOS_FILE);
   const numero = req.params.numero;
-  const { nome = 'Usuario' } = req.query; // Pega o nome da query string, se houver
+  const { nome = 'Usuario' } = req.query;
 
   if (usuarios[numero]) {
-    // Usuário existe, atualiza o último contato e retorna
     usuarios[numero].ultimoContato = new Date().toISOString();
     salvarArquivo(USUARIOS_FILE, usuarios);
     res.json(usuarios[numero]);
   } else {
-    // Usuário não existe, cria um novo
     const novoUsuario = {
       numero: numero,
       nome: nome,
@@ -97,11 +84,12 @@ app.get('/api/usuarios/:numero', (req, res) => {
       aceitaMensagens: true,
       primeiroContato: new Date().toISOString(),
       ultimoContato: new Date().toISOString(),
+      historico: [], // Adicionado campo de histórico
       tags: []
     };
     usuarios[numero] = novoUsuario;
     salvarArquivo(USUARIOS_FILE, usuarios);
-    res.status(201).json(novoUsuario); // 201 Created
+    res.status(201).json(novoUsuario);
   }
 });
 
@@ -115,16 +103,9 @@ app.put('/api/usuarios/:numero', (req, res) => {
     return res.status(404).json({ erro: 'Usuário não encontrado' });
   }
 
-  // Atualiza os campos fornecidos
-  if (nome !== undefined) {
-    usuarios[numero].nome = nome;
-  }
-  if (pausado !== undefined) {
-    usuarios[numero].pausado = pausado;
-  }
-  if (aceitaMensagens !== undefined) {
-    usuarios[numero].aceitaMensagens = aceitaMensagens;
-  }
+  if (nome !== undefined) usuarios[numero].nome = nome;
+  if (pausado !== undefined) usuarios[numero].pausado = pausado;
+  if (aceitaMensagens !== undefined) usuarios[numero].aceitaMensagens = aceitaMensagens;
   
   usuarios[numero].ultimoContato = new Date().toISOString();
 
@@ -135,16 +116,39 @@ app.put('/api/usuarios/:numero', (req, res) => {
   }
 });
 
+// POST /api/usuarios/:numero/historico - Adicionar mensagem ao histórico
+app.post('/api/usuarios/:numero/historico', (req, res) => {
+  const usuarios = lerArquivo(USUARIOS_FILE);
+  const numero = req.params.numero;
+  const { remetente, mensagem } = req.body; // remetente pode ser 'user' ou 'bot'
 
-// =============================
-// ===== ROTAS LEGADAS (N8N) =====
-// =============================
+  if (!usuarios[numero]) {
+    return res.status(404).json({ erro: 'Usuário não encontrado' });
+  }
+  if (!remetente || !mensagem) {
+    return res.status(400).json({ erro: 'Remetente e mensagem são obrigatórios' });
+  }
 
-// GET /produtos - Compatibilidade para o n8n não quebrar
-app.get('/produtos', (req, res) => {
-  const produtos = lerArquivo(PRODUTOS_FILE);
-  res.json(produtos);
+  const novaMensagem = {
+    remetente,
+    mensagem,
+    timestamp: new Date().toISOString()
+  };
+
+  usuarios[numero].historico.push(novaMensagem);
+
+  // Manter apenas as últimas 15 mensagens
+  if (usuarios[numero].historico.length > 15) {
+    usuarios[numero].historico.shift(); 
+  }
+
+  if (salvarArquivo(USUARIOS_FILE, usuarios)) {
+    res.status(201).json(novaMensagem);
+  } else {
+    res.status(500).json({ erro: 'Erro ao salvar histórico' });
+  }
 });
+
 
 // =============================
 // ===== ROTAS DO SERVIDOR =====
