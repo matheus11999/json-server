@@ -245,6 +245,17 @@ app.delete('/api/usuarios/:numero', (req, res) => {
   }
 });
 
+// DELETE /api/usuarios - Limpar todos os usuários (para desenvolvimento)
+app.delete('/api/usuarios', (req, res) => {
+  console.log('AVISO: Limpando todos os usuários do sistema.');
+  
+  if (salvarArquivo(USUARIOS_FILE, {})) {
+    res.json({ mensagem: 'Todos os usuários foram removidos com sucesso' });
+  } else {
+    res.status(500).json({ erro: 'Erro ao limpar usuários' });
+  }
+});
+
 // GET /api/pausados/:numero - Verificar se usuário está pausado (Endpoint de legado)
 app.get('/api/pausados/:numero', (req, res) => {
   console.log(`AVISO: A rota legada /api/pausados/:numero foi chamada para o número ${req.params.numero}. Considere atualizar o fluxo para usar GET /api/usuarios/:numero e verificar a propriedade 'pausado'.`);
