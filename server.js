@@ -379,11 +379,25 @@ app.post('/api/build-ai-payload', (req, res) => {
   }
 
   const config = lerArquivo(CONFIG_FILE);
+  const produtosList = lerArquivo(PRODUTOS_FILE);
+
+  // Construir lista de produtos formatada para a IA
+  let produtosTexto = '\n\n**PRODUTOS DISPONÍVEIS:**\n';
+  if (produtosList.length === 0) {
+    produtosTexto += 'Nenhum produto em estoque no momento.';
+  } else {
+    produtosList.forEach(produto => {
+      const status = produto.quantidade > 0 ? '✅ DISPONÍVEL' : '❌ FORA DE ESTOQUE';
+      produtosTexto += `\n- ${produto.nome}: R$ ${produto.valor.toFixed(2)} (Qtd: ${produto.quantidade}) ${status}`;
+    });
+  }
+
+  const systemMessage = config.ia.treinamento + produtosTexto;
 
   const aiPayload = {
     model: config.ia.modelo,
     messages: [
-      { role: "system", content: config.ia.treinamento },
+      { role: "system", content: systemMessage },
       { role: "user", content: mensagem }
     ]
   };
