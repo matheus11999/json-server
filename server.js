@@ -227,6 +227,21 @@ app.put('/api/usuarios/:numero', (req, res) => {
   }
 });
 
+// GET /api/pausados/:numero - Verificar se usuário está pausado (Endpoint de legado)
+app.get('/api/pausados/:numero', (req, res) => {
+  console.log(`AVISO: A rota legada /api/pausados/:numero foi chamada para o número ${req.params.numero}. Considere atualizar o fluxo para usar GET /api/usuarios/:numero e verificar a propriedade 'pausado'.`);
+  const usuarios = lerArquivo(USUARIOS_FILE);
+  const numero = req.params.numero;
+
+  if (!usuarios[numero]) {
+    // Se o usuário não existe, ele não está pausado.
+    return res.json({ pausado: false });
+  }
+
+  // Retorna true se pausado for explicitamente true, senão false.
+  res.json({ pausado: usuarios[numero].pausado === true });
+});
+
 // POST /api/usuarios/:numero/historico - Adicionar mensagem ao histórico
 app.post('/api/usuarios/:numero/historico', (req, res) => {
   const usuarios = lerArquivo(USUARIOS_FILE);
