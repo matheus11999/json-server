@@ -162,7 +162,7 @@ function renderizarUsuarios() {
     const tbody = document.getElementById('usuarios-lista');
     
     if (usuarios.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Nenhum usuário encontrado</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Nenhum usuário encontrado</td></tr>';
         return;
     }
     
@@ -177,13 +177,24 @@ function renderizarUsuarios() {
             </td>
             <td>
                 <label class="switch">
-                    <input type="checkbox" ${!usuario.pausado ? 'checked' : ''} onchange="togglePausado('${usuario.numero}', ${!usuario.pausado})">
+                    <input type="checkbox" ${!usuario.pausado ? 'checked' : ''} onchange="togglePausado('${usuario.numero}', this.checked)">
                     <span class="slider round"></span>
                 </label>
             </td>
             <td>
-                <button class="btn btn-info" onclick="verHistorico('${usuario.numero}', '${usuario.nome}')">
+                <label class="switch">
+                    <input type="checkbox" ${usuario.aceitaMensagens ? 'checked' : ''} onchange="toggleNotificacoes('${usuario.numero}', this.checked)">
+                    <span class="slider round"></span>
+                </label>
+            </td>
+            <td>
+                <button class="btn btn-info" onclick="verHistorico('${usuario.numero}')">
                     Ver Histórico
+                </button>
+            </td>
+            <td>
+                <button class="btn btn-danger" onclick="removerUsuario('${usuario.numero}')">
+                    Remover
                 </button>
             </td>
         </tr>
@@ -201,45 +212,89 @@ async function togglePausado(numero, estaAtivo) {
         });
         
         if (response.ok) {
-            showAlert(`Usuário ${novoStatusPausado ? 'pausado' : 'reativado'} com sucesso!`);
+            showAlert(`Bot ${novoStatusPausado ? 'pausado' : 'reativado'} para o usuário!`);
+            const user = usuarios.find(u => u.numero === numero);
+            if(user) user.pausado = novoStatusPausado;
+            renderizarUsuarios();
+        } else {
+            showAlert('Erro ao atualizar status do bot', 'error');
+        }
+    } catch (error) {
+        showAlert('Erro ao atualizar status do bot', 'error');
+        console.error('Erro:', error);
+    }
+}
+
+async function toggleNotificacoes(numero, aceitaMensagens) {
+    try {
+        const response = await fetch(`${API_BASE}/api/usuarios/${numero}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ aceitaMensagens })
+        });
+        
+        if (response.ok) {
+            showAlert(`Notificações ${aceitaMensagens ? 'ativadas' : 'desativadas'} para o usuário!`);
+            const user = usuarios.find(u => u.numero === numero);
+            if(user) user.aceitaMensagens = aceitaMensagens;
+            renderizarUsuarios();
+        } else {
+            showAlert('Erro ao atualizar notificações', 'error');
+        }
+    } catch (error) {
+        showAlert('Erro ao atualizar notificações', 'error');
+        console.error('Erro:', error);
+    }
+}
+
+async function removerUsuario(numero) {
+    if (!confirm(`Tem certeza que deseja remover o usuário ${numero}? Esta ação não pode ser desfeita.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/usuarios/${numero}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showAlert('Usuário removido com sucesso!');
             carregarUsuarios();
             carregarStatus();
         } else {
-            showAlert('Erro ao atualizar status do usuário', 'error');
+            const error = await response.json();
+            showAlert(error.erro || 'Erro ao remover usuário', 'error');
         }
     } catch (error) {
-        showAlert('Erro ao atualizar status do usuário', 'error');
+        showAlert('Erro ao remover usuário', 'error');
         console.error('Erro:', error);
     }
 }
 
 // === HISTÓRICO ===
 
-async function verHistorico(numero, nome) {
-    try {
-        const response = await fetch(`${API_BASE}/api/usuarios/${numero}`);
-        const usuario = await response.json();
-        
-        document.getElementById('historicoTitulo').textContent = `Histórico de ${nome} (${numero})`;
-        
-        const conteudo = document.getElementById('historicoConteudo');
-        
-        if (!usuario.historico || usuario.historico.length === 0) {
-            conteudo.innerHTML = '<p style="text-align: center; color: #666;">Nenhuma mensagem no histórico</p>';
-        } else {
-            conteudo.innerHTML = usuario.historico.map(msg => `
-                <div class="historico-item ${msg.remetente === 'user' ? 'historico-user' : 'historico-bot'}">
-                    <strong>${msg.remetente === 'user' ? 'Usuário' : 'Bot'}:</strong> ${msg.mensagem}
-                    <br><small>${formatarData(msg.timestamp)}</small>
-                </div>
-            `).join('');
-        }
-        
-        document.getElementById('historicoModal').style.display = 'block';
-    } catch (error) {
-        showAlert('Erro ao carregar histórico', 'error');
-        console.error('Erro ao carregar histórico:', error);
+async function verHistorico(numero) {
+    const usuario = usuarios.find(u => u.numero === numero);
+    if (!usuario) {
+        showAlert('Usuário não encontrado para carregar o histórico.', 'error');
+        return;
     }
+    
+    document.getElementById('historicoTitulo').textContent = `Histórico de ${usuario.nome} (${numero})`;
+    const conteudo = document.getElementById('historicoConteudo');
+    
+    if (!usuario.historico || usuario.historico.length === 0) {
+        conteudo.innerHTML = '<p style="text-align: center; color: #666;">Nenhuma mensagem no histórico</p>';
+    } else {
+        conteudo.innerHTML = usuario.historico.map(msg => `
+            <div class="historico-item ${msg.remetente === 'user' ? 'historico-user' : 'historico-bot'}">
+                <strong>${msg.remetente === 'user' ? 'Usuário' : 'Bot'}:</strong> ${msg.mensagem}
+                <br><small>${formatarData(msg.timestamp)}</small>
+            </div>
+        `).join('');
+    }
+    
+    document.getElementById('historicoModal').style.display = 'block';
 }
 
 function fecharHistorico() {

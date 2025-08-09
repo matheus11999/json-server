@@ -227,6 +227,24 @@ app.put('/api/usuarios/:numero', (req, res) => {
   }
 });
 
+// DELETE /api/usuarios/:numero - Remover usuário
+app.delete('/api/usuarios/:numero', (req, res) => {
+  const usuarios = lerArquivo(USUARIOS_FILE);
+  const numero = req.params.numero;
+
+  if (!usuarios[numero]) {
+    return res.status(404).json({ erro: 'Usuário não encontrado' });
+  }
+
+  delete usuarios[numero];
+  
+  if (salvarArquivo(USUARIOS_FILE, usuarios)) {
+    res.json({ mensagem: 'Usuário removido com sucesso' });
+  } else {
+    res.status(500).json({ erro: 'Erro ao remover usuário' });
+  }
+});
+
 // GET /api/pausados/:numero - Verificar se usuário está pausado (Endpoint de legado)
 app.get('/api/pausados/:numero', (req, res) => {
   console.log(`AVISO: A rota legada /api/pausados/:numero foi chamada para o número ${req.params.numero}. Considere atualizar o fluxo para usar GET /api/usuarios/:numero e verificar a propriedade 'pausado'.`);
