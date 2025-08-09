@@ -382,7 +382,7 @@ app.post('/api/build-ai-payload', (req, res) => {
   const produtosList = lerArquivo(PRODUTOS_FILE);
 
   // Construir lista de produtos formatada para a IA
-  let produtosTexto = '\n\n--- ESTOQUE DE PRODUTOS ---\n';
+  let produtosTexto = '\n--- ESTOQUE DE PRODUTOS ---\n';
   if (produtosList.length === 0) {
     produtosTexto += 'Nenhum produto em estoque no momento.';
   } else {
