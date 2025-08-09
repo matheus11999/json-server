@@ -51,9 +51,94 @@ function salvarArquivo(arquivo, dados) {
 // =============================
 // ===== ROTAS DE PRODUTOS =====
 // =============================
+
+// GET /api/produtos - Listar todos os produtos
 app.get('/api/produtos', (req, res) => {
   const produtos = lerArquivo(PRODUTOS_FILE);
   res.json(produtos);
+});
+
+// GET /api/produtos/:id - Buscar produto por ID
+app.get('/api/produtos/:id', (req, res) => {
+  const produtos = lerArquivo(PRODUTOS_FILE);
+  const produto = produtos.find(p => p.id == req.params.id);
+  
+  if (!produto) {
+    return res.status(404).json({ erro: 'Produto não encontrado' });
+  }
+  
+  res.json(produto);
+});
+
+// POST /api/produtos - Criar novo produto
+app.post('/api/produtos', (req, res) => {
+  const produtos = lerArquivo(PRODUTOS_FILE);
+  const { nome, quantidade, valor } = req.body;
+
+  if (!nome || quantidade === undefined || valor === undefined) {
+    return res.status(400).json({ erro: 'Nome, quantidade e valor são obrigatórios' });
+  }
+
+  // Gerar novo ID
+  const novoId = produtos.length > 0 ? Math.max(...produtos.map(p => p.id)) + 1 : 1;
+  
+  const novoProduto = {
+    id: novoId,
+    nome: nome.trim(),
+    quantidade: parseInt(quantidade),
+    valor: parseFloat(valor)
+  };
+
+  produtos.push(novoProduto);
+  
+  if (salvarArquivo(PRODUTOS_FILE, produtos)) {
+    res.status(201).json(novoProduto);
+  } else {
+    res.status(500).json({ erro: 'Erro ao criar produto' });
+  }
+});
+
+// PUT /api/produtos/:id - Atualizar produto
+app.put('/api/produtos/:id', (req, res) => {
+  const produtos = lerArquivo(PRODUTOS_FILE);
+  const id = parseInt(req.params.id);
+  const { nome, quantidade, valor } = req.body;
+
+  const index = produtos.findIndex(p => p.id === id);
+  
+  if (index === -1) {
+    return res.status(404).json({ erro: 'Produto não encontrado' });
+  }
+
+  if (nome !== undefined) produtos[index].nome = nome.trim();
+  if (quantidade !== undefined) produtos[index].quantidade = parseInt(quantidade);
+  if (valor !== undefined) produtos[index].valor = parseFloat(valor);
+
+  if (salvarArquivo(PRODUTOS_FILE, produtos)) {
+    res.json(produtos[index]);
+  } else {
+    res.status(500).json({ erro: 'Erro ao atualizar produto' });
+  }
+});
+
+// DELETE /api/produtos/:id - Remover produto
+app.delete('/api/produtos/:id', (req, res) => {
+  const produtos = lerArquivo(PRODUTOS_FILE);
+  const id = parseInt(req.params.id);
+
+  const index = produtos.findIndex(p => p.id === id);
+  
+  if (index === -1) {
+    return res.status(404).json({ erro: 'Produto não encontrado' });
+  }
+
+  const produtoRemovido = produtos.splice(index, 1)[0];
+  
+  if (salvarArquivo(PRODUTOS_FILE, produtos)) {
+    res.json({ mensagem: 'Produto removido com sucesso', produto: produtoRemovido });
+  } else {
+    res.status(500).json({ erro: 'Erro ao remover produto' });
+  }
 });
 
 // =============================
@@ -84,13 +169,42 @@ app.get('/api/usuarios/:numero', (req, res) => {
       aceitaMensagens: true,
       primeiroContato: new Date().toISOString(),
       ultimoContato: new Date().toISOString(),
-      historico: [], // Adicionado campo de histórico
+      historico: [],
       tags: []
     };
     usuarios[numero] = novoUsuario;
     salvarArquivo(USUARIOS_FILE, usuarios);
     res.status(201).json(novoUsuario);
   }
+});
+
+// GET /api/usuarios/:numero/pode-responder - Verificar se pode responder para o usuário
+app.get('/api/usuarios/:numero/pode-responder', (req, res) => {
+  const usuarios = lerArquivo(USUARIOS_FILE);
+  const numero = req.params.numero;
+
+  if (!usuarios[numero]) {
+    return res.json({ podeResponder: true, motivo: 'Usuario novo' });
+  }
+
+  const usuario = usuarios[numero];
+  const podeResponder = !usuario.pausado && usuario.aceitaMensagens;
+  
+  let motivo = '';
+  if (usuario.pausado) motivo = 'Usuario pausado pelo admin';
+  else if (!usuario.aceitaMensagens) motivo = 'Usuario não aceita mensagens de IA';
+  else motivo = 'Usuario ativo';
+
+  res.json({ 
+    podeResponder, 
+    motivo,
+    usuario: {
+      nome: usuario.nome,
+      numero: usuario.numero,
+      pausado: usuario.pausado,
+      aceitaMensagens: usuario.aceitaMensagens
+    }
+  });
 });
 
 // PUT /api/usuarios/:numero - Atualizar dados do usuário
