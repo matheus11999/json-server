@@ -149,11 +149,26 @@
             <!-- Seção Configurações -->
             <div id="configuracoes-section" class="section">
                 <h2>Configurações do Sistema</h2>
-                <p>Configure o treinamento da IA do chatbot.</p>
+                <p>Configure as configurações da IA e do sistema de histórico.</p>
+                
+                <div class="form-group">
+                    <label for="apiKey">API Key OpenRouter:</label>
+                    <input type="password" id="apiKey" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;" placeholder="sk-or-v1-...">
+                </div>
+                
+                <div class="form-group">
+                    <label for="modelo">Modelo da IA:</label>
+                    <input type="text" id="modelo" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;" placeholder="z-ai/glm-4.5-air:free">
+                </div>
+                
+                <div class="form-group">
+                    <label for="limiteMensagens">Limite de Mensagens no Histórico:</label>
+                    <input type="number" id="limiteMensagens" min="5" max="50" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;" placeholder="15">
+                </div>
                 
                 <div class="form-group">
                     <label for="treinamentoIA">Treinamento da IA (System Message):</label>
-                    <textarea id="treinamentoIA" rows="15" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;" placeholder="Digite aqui o prompt completo para treinar a IA..."></textarea>
+                    <textarea id="treinamentoIA" rows="12" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;" placeholder="Digite aqui o prompt completo para treinar a IA..."></textarea>
                 </div>
                 
                 <div class="btn-container">

@@ -164,14 +164,23 @@ app.get('/api/config', (req, res) => {
 
 // PUT /api/config - Atualizar configurações
 app.put('/api/config', (req, res) => {
-  const { treinamento } = req.body;
+  const { apiKey, modelo, treinamento, limiteMensagens } = req.body;
   
-  if (!treinamento) {
-    return res.status(400).json({ erro: 'Treinamento é obrigatório' });
+  if (!treinamento && !apiKey && !modelo && !limiteMensagens) {
+    return res.status(400).json({ erro: 'Pelo menos um campo deve ser fornecido' });
   }
 
   const config = lerArquivo(CONFIG_FILE);
-  config.ia.treinamento = treinamento;
+  
+  // Atualizar campos da IA se fornecidos
+  if (apiKey !== undefined) config.ia.apiKey = apiKey;
+  if (modelo !== undefined) config.ia.modelo = modelo;
+  if (treinamento !== undefined) config.ia.treinamento = treinamento;
+  
+  // Atualizar limite de mensagens se fornecido
+  if (limiteMensagens !== undefined) {
+    config.historico.limiteMensagens = parseInt(limiteMensagens);
+  }
 
   if (salvarArquivo(CONFIG_FILE, config)) {
     res.json(config);

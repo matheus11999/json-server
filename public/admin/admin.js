@@ -379,6 +379,9 @@ async function carregarConfiguracoes() {
         const response = await fetch(`${API_BASE}/api/config`);
         const config = await response.json();
         
+        document.getElementById('apiKey').value = config.ia?.apiKey || '';
+        document.getElementById('modelo').value = config.ia?.modelo || '';
+        document.getElementById('limiteMensagens').value = config.historico?.limiteMensagens || 15;
         document.getElementById('treinamentoIA').value = config.ia?.treinamento || '';
     } catch (error) {
         showAlert('Erro ao carregar configurações', 'error');
@@ -387,10 +390,28 @@ async function carregarConfiguracoes() {
 }
 
 async function salvarConfiguracoes() {
+    const apiKey = document.getElementById('apiKey').value.trim();
+    const modelo = document.getElementById('modelo').value.trim();
+    const limiteMensagens = parseInt(document.getElementById('limiteMensagens').value);
     const treinamento = document.getElementById('treinamentoIA').value.trim();
     
     if (!treinamento) {
         showAlert('O treinamento da IA não pode estar vazio', 'error');
+        return;
+    }
+    
+    if (!apiKey) {
+        showAlert('A API Key não pode estar vazia', 'error');
+        return;
+    }
+    
+    if (!modelo) {
+        showAlert('O modelo da IA não pode estar vazio', 'error');
+        return;
+    }
+    
+    if (isNaN(limiteMensagens) || limiteMensagens < 5 || limiteMensagens > 50) {
+        showAlert('O limite de mensagens deve ser entre 5 e 50', 'error');
         return;
     }
 
@@ -398,7 +419,12 @@ async function salvarConfiguracoes() {
         const response = await fetch(`${API_BASE}/api/config`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ treinamento })
+            body: JSON.stringify({ 
+                apiKey, 
+                modelo, 
+                limiteMensagens, 
+                treinamento 
+            })
         });
         
         if (response.ok) {
