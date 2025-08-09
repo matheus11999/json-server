@@ -13,14 +13,11 @@ app.use(bodyParser.json());
 app.use(express.static('public'));
 
 // --- Arquivos de Dados ---
-const DATA_DIR = '/app/data';
+const DATA_DIR = path.join(__dirname, 'app', 'data');
 const PRODUTOS_FILE = path.join(DATA_DIR, 'produtos.json');
 const USUARIOS_FILE = path.join(DATA_DIR, 'usuarios.json');
 
 // --- Inicialização ---
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
 if (!fs.existsSync(PRODUTOS_FILE)) {
   fs.writeFileSync(PRODUTOS_FILE, JSON.stringify([], null, 2));
 }
