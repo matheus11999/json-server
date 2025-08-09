@@ -248,9 +248,21 @@ app.post('/api/usuarios/:numero/historico', (req, res) => {
   const numero = req.params.numero;
   const { remetente, mensagem } = req.body; // remetente pode ser 'user' ou 'bot'
 
+  // Se o usuário não existir, crie um novo com valores padrão
   if (!usuarios[numero]) {
-    return res.status(404).json({ erro: 'Usuário não encontrado' });
+    console.log(`INFO: Usuário ${numero} não encontrado ao salvar histórico. Criando novo usuário.`);
+    usuarios[numero] = {
+      numero: numero,
+      nome: 'Usuario', // Nome padrão, já que não temos o pushName aqui
+      pausado: false,
+      aceitaMensagens: true,
+      primeiroContato: new Date().toISOString(),
+      ultimoContato: new Date().toISOString(),
+      historico: [],
+      tags: []
+    };
   }
+
   if (!remetente || !mensagem) {
     return res.status(400).json({ erro: 'Remetente e mensagem são obrigatórios' });
   }
@@ -262,10 +274,11 @@ app.post('/api/usuarios/:numero/historico', (req, res) => {
   };
 
   usuarios[numero].historico.push(novaMensagem);
+  usuarios[numero].ultimoContato = new Date().toISOString(); // Atualiza o último contato
 
   // Manter apenas as últimas 15 mensagens
   if (usuarios[numero].historico.length > 15) {
-    usuarios[numero].historico.shift(); 
+    usuarios[numero].historico.shift();
   }
 
   if (salvarArquivo(USUARIOS_FILE, usuarios)) {
