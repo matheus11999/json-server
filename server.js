@@ -382,7 +382,7 @@ app.post('/api/build-ai-payload', (req, res) => {
   const produtosList = lerArquivo(PRODUTOS_FILE);
 
   // Construir lista de produtos formatada para a IA
-  let produtosTexto = '\n\n**PRODUTOS DISPONÍVEIS:**\n';
+  let produtosTexto = '\n\n--- ESTOQUE DE PRODUTOS ---\n';
   if (produtosList.length === 0) {
     produtosTexto += 'Nenhum produto em estoque no momento.';
   } else {
@@ -392,7 +392,7 @@ app.post('/api/build-ai-payload', (req, res) => {
     });
   }
 
-  const systemMessage = config.ia.treinamento + produtosTexto;
+  const systemMessage = config.ia.treinamento + produtosTexto + '\n\n--- HISTÓRICO DE CONVERSAS ---\nAs mensagens anteriores desta conversa estão incluídas no contexto para continuidade.';
 
   // Construir array de mensagens com histórico
   const messages = [{ role: "system", content: systemMessage }];
