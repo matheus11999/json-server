@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarStatus();
     carregarProdutos();
     carregarUsuarios();
+    carregarConfiguracoes();
     
     // Event listener para o formulário de produto
     document.getElementById('produtoForm').addEventListener('submit', async (e) => {
@@ -68,6 +69,8 @@ function showTab(tab) {
         carregarProdutos();
     } else if (tab === 'usuarios') {
         carregarUsuarios();
+    } else if (tab === 'configuracoes') {
+        carregarConfiguracoes();
     }
 }
 
@@ -366,6 +369,47 @@ window.onclick = function(event) {
     }
     if (event.target == produtoModal) {
         produtoModal.style.display = 'none';
+    }
+}
+
+// === CONFIGURAÇÕES ===
+
+async function carregarConfiguracoes() {
+    try {
+        const response = await fetch(`${API_BASE}/api/config`);
+        const config = await response.json();
+        
+        document.getElementById('treinamentoIA').value = config.ia?.treinamento || '';
+    } catch (error) {
+        showAlert('Erro ao carregar configurações', 'error');
+        console.error('Erro ao carregar configurações:', error);
+    }
+}
+
+async function salvarConfiguracoes() {
+    const treinamento = document.getElementById('treinamentoIA').value.trim();
+    
+    if (!treinamento) {
+        showAlert('O treinamento da IA não pode estar vazio', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/config`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ treinamento })
+        });
+        
+        if (response.ok) {
+            showAlert('Configurações salvas com sucesso!');
+        } else {
+            const error = await response.json();
+            showAlert(error.erro || 'Erro ao salvar configurações', 'error');
+        }
+    } catch (error) {
+        showAlert('Erro ao salvar configurações', 'error');
+        console.error('Erro:', error);
     }
 }
 

@@ -16,6 +16,7 @@ app.use(express.static('public'));
 const DATA_DIR = path.join(__dirname, 'app', 'data');
 const PRODUTOS_FILE = path.join(DATA_DIR, 'produtos.json');
 const USUARIOS_FILE = path.join(DATA_DIR, 'usuarios.json');
+const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
 
 // --- Inicialização ---
 if (!fs.existsSync(PRODUTOS_FILE)) {
@@ -23,6 +24,19 @@ if (!fs.existsSync(PRODUTOS_FILE)) {
 }
 if (!fs.existsSync(USUARIOS_FILE)) {
   fs.writeFileSync(USUARIOS_FILE, JSON.stringify({}, null, 2));
+}
+if (!fs.existsSync(CONFIG_FILE)) {
+  const defaultConfig = {
+    ia: {
+      modelo: "z-ai/glm-4.5-air:free",
+      apiKey: "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",
+      treinamento: "Você é o S.O.S. Bot, assistente virtual da SOS Celular."
+    },
+    historico: {
+      limiteMensagens: 15
+    }
+  };
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(defaultConfig, null, 2));
 }
 
 // --- Funções Auxiliares ---
@@ -135,6 +149,34 @@ app.delete('/api/produtos/:id', (req, res) => {
     res.json({ mensagem: 'Produto removido com sucesso', produto: produtoRemovido });
   } else {
     res.status(500).json({ erro: 'Erro ao remover produto' });
+  }
+});
+
+// =============================
+// ===== ROTAS DE CONFIGURAÇÕES =====
+// =============================
+
+// GET /api/config - Buscar configurações
+app.get('/api/config', (req, res) => {
+  const config = lerArquivo(CONFIG_FILE);
+  res.json(config);
+});
+
+// PUT /api/config - Atualizar configurações
+app.put('/api/config', (req, res) => {
+  const { treinamento } = req.body;
+  
+  if (!treinamento) {
+    return res.status(400).json({ erro: 'Treinamento é obrigatório' });
+  }
+
+  const config = lerArquivo(CONFIG_FILE);
+  config.ia.treinamento = treinamento;
+
+  if (salvarArquivo(CONFIG_FILE, config)) {
+    res.json(config);
+  } else {
+    res.status(500).json({ erro: 'Erro ao salvar configurações' });
   }
 });
 
@@ -305,8 +347,10 @@ app.post('/api/usuarios/:numero/historico', (req, res) => {
   usuarios[numero].historico.push(novaMensagem);
   usuarios[numero].ultimoContato = new Date().toISOString(); // Atualiza o último contato
 
-  // Manter apenas as últimas 15 mensagens
-  if (usuarios[numero].historico.length > 15) {
+  // Manter apenas as últimas N mensagens conforme configuração
+  const config = lerArquivo(CONFIG_FILE);
+  const limiteMensagens = config.historico?.limiteMensagens || 15;
+  while (usuarios[numero].historico.length > limiteMensagens) {
     usuarios[numero].historico.shift();
   }
 
@@ -317,6 +361,29 @@ app.post('/api/usuarios/:numero/historico', (req, res) => {
   }
 });
 
+// POST /api/build-ai-payload - Construir payload da IA usando configurações
+app.post('/api/build-ai-payload', (req, res) => {
+  const { produtos, usuario, mensagem } = req.body;
+  
+  if (!usuario || !mensagem) {
+    return res.status(400).json({ erro: 'Usuário e mensagem são obrigatórios' });
+  }
+
+  const config = lerArquivo(CONFIG_FILE);
+
+  const aiPayload = {
+    model: config.ia.modelo,
+    messages: [
+      { role: "system", content: config.ia.treinamento },
+      { role: "user", content: mensagem }
+    ]
+  };
+
+  res.json({
+    payload: aiPayload,
+    apiKey: config.ia.apiKey
+  });
+});
 
 // =============================
 // ===== ROTAS DO SERVIDOR =====
