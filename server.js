@@ -394,12 +394,23 @@ app.post('/api/build-ai-payload', (req, res) => {
 
   const systemMessage = config.ia.treinamento + produtosTexto;
 
+  // Construir array de mensagens com histórico
+  const messages = [{ role: "system", content: systemMessage }];
+
+  // Adicionar histórico de mensagens se existir
+  if (usuario.historico && usuario.historico.length > 0) {
+    usuario.historico.forEach(msg => {
+      const role = msg.remetente === 'user' ? 'user' : 'assistant';
+      messages.push({ role: role, content: msg.mensagem });
+    });
+  }
+
+  // Adicionar a mensagem atual do usuário
+  messages.push({ role: "user", content: mensagem });
+
   const aiPayload = {
     model: config.ia.modelo,
-    messages: [
-      { role: "system", content: systemMessage },
-      { role: "user", content: mensagem }
-    ]
+    messages: messages
   };
 
   res.json({
