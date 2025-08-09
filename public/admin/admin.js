@@ -191,8 +191,11 @@ function renderizarUsuarios() {
                 </label>
             </td>
             <td>
-                <button class="btn btn-info" onclick="verHistorico('${usuario.numero}')">
+                <button class="btn btn-info" onclick="verHistorico('${usuario.numero}')" style="margin-right: 5px;">
                     Ver Histórico
+                </button>
+                <button class="btn btn-warning" onclick="limparHistorico('${usuario.numero}')">
+                    Limpar Histórico
                 </button>
             </td>
             <td>
@@ -275,6 +278,38 @@ async function removerUsuario(numero) {
 }
 
 // === HISTÓRICO ===
+
+async function limparHistorico(numero) {
+    const usuario = usuarios.find(u => u.numero === numero);
+    if (!usuario) {
+        showAlert('Usuário não encontrado', 'error');
+        return;
+    }
+    
+    if (!confirm(`Tem certeza que deseja limpar todo o histórico de ${usuario.nome}? Esta ação não pode ser desfeita.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/usuarios/${numero}/historico`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showAlert('Histórico limpo com sucesso!');
+            // Atualizar o usuário local
+            const user = usuarios.find(u => u.numero === numero);
+            if(user) user.historico = [];
+            carregarUsuarios();
+        } else {
+            const error = await response.json();
+            showAlert(error.erro || 'Erro ao limpar histórico', 'error');
+        }
+    } catch (error) {
+        showAlert('Erro ao limpar histórico', 'error');
+        console.error('Erro:', error);
+    }
+}
 
 async function verHistorico(numero) {
     const usuario = usuarios.find(u => u.numero === numero);
