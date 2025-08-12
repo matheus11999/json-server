@@ -11,25 +11,6 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
-
-// Middleware de autenticação para rotas admin
-function verificarAuth(req, res, next) {
-  const { authorization } = req.headers;
-  
-  if (req.path === '/admin' || req.path === '/admin/' || req.path === '/admin/index.html' || req.path === '/api/login') {
-    return next();
-  }
-  
-  if (req.path.startsWith('/admin/') || req.path.startsWith('/api/')) {
-    if (!authorization || authorization !== `Bearer ${ADMIN_PASSWORD}`) {
-      return res.status(401).json({ erro: 'Não autorizado' });
-    }
-  }
-  
-  next();
-}
-
-app.use(verificarAuth);
 app.use(express.static('public'));
 
 // --- Arquivos de Dados ---
@@ -489,14 +470,26 @@ app.post('/api/login', (req, res) => {
   }
 });
 
-// =============================
-// ===== ROTAS DO SERVIDOR =====
-// =============================
+// Middleware de autenticação para rotas protegidas
+function verificarAuth(req, res, next) {
+  const { authorization } = req.headers;
+  
+  if (!authorization || authorization !== `Bearer ${ADMIN_PASSWORD}`) {
+    return res.status(401).json({ erro: 'Não autorizado' });
+  }
+  
+  next();
+}
 
-app.get('/', (req, res) => {
-  res.redirect('/admin');
+// Aplicar middleware de autenticação para todas as rotas da API exceto login e health
+app.use('/api', (req, res, next) => {
+  if (req.path === '/login') {
+    return next();
+  }
+  verificarAuth(req, res, next);
 });
 
+// Rota health pública
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
@@ -504,6 +497,14 @@ app.get('/health', (req, res) => {
     totalProdutos: lerArquivo(PRODUTOS_FILE).length,
     totalUsuarios: Object.keys(lerArquivo(USUARIOS_FILE)).length
   });
+});
+
+// =============================
+// ===== ROTAS DO SERVIDOR =====
+// =============================
+
+app.get('/', (req, res) => {
+  res.redirect('/admin');
 });
 
 // =============================

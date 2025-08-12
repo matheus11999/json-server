@@ -181,7 +181,7 @@ function formatarData(isoString) {
 // Status do sistema
 async function carregarStatus() {
     try {
-        const response = await fetchAuth(`${API_BASE}/health`);
+        const response = await fetch(`${API_BASE}/health`);
         const data = await response.json();
         
         document.getElementById('status-text').textContent = 
