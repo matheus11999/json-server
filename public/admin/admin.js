@@ -4,13 +4,24 @@ const API_BASE = window.location.origin;
 // Estado global
 let produtos = [];
 let usuarios = [];
+let authToken = null;
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
-    carregarStatus();
-    carregarProdutos();
-    carregarUsuarios();
-    carregarConfiguracoes();
+    // Verificar se há token salvo
+    authToken = localStorage.getItem('admin_token');
+    
+    if (authToken) {
+        mostrarPainelPrincipal();
+    } else {
+        mostrarTelaLogin();
+    }
+    
+    // Event listener para o formulário de login
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await realizarLogin();
+    });
     
     // Event listener para o formulário de produto
     document.getElementById('produtoForm').addEventListener('submit', async (e) => {
@@ -27,16 +38,14 @@ document.addEventListener('DOMContentLoaded', () => {
             let response;
             if (id) {
                 // Editar produto existente
-                response = await fetch(`${API_BASE}/api/produtos/${id}`, {
+                response = await fetchAuth(`${API_BASE}/api/produtos/${id}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(dadosProduto)
                 });
             } else {
                 // Criar novo produto
-                response = await fetch(`${API_BASE}/api/produtos`, {
+                response = await fetchAuth(`${API_BASE}/api/produtos`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(dadosProduto)
                 });
             }
@@ -56,6 +65,84 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+// === AUTENTICAÇÃO ===
+
+function mostrarTelaLogin() {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('main-panel').style.display = 'none';
+}
+
+function mostrarPainelPrincipal() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-panel').style.display = 'block';
+    
+    // Carregar dados
+    carregarStatus();
+    carregarProdutos();
+    carregarUsuarios();
+    carregarConfiguracoes();
+}
+
+async function realizarLogin() {
+    const password = document.getElementById('password').value;
+    const loginAlert = document.getElementById('login-alert');
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            authToken = data.token;
+            localStorage.setItem('admin_token', authToken);
+            mostrarPainelPrincipal();
+            loginAlert.style.display = 'none';
+        } else {
+            loginAlert.className = 'alert error';
+            loginAlert.textContent = data.erro || 'Erro ao fazer login';
+            loginAlert.style.display = 'block';
+        }
+    } catch (error) {
+        loginAlert.className = 'alert error';
+        loginAlert.textContent = 'Erro de conexão. Tente novamente.';
+        loginAlert.style.display = 'block';
+        console.error('Erro no login:', error);
+    }
+}
+
+function logout() {
+    authToken = null;
+    localStorage.removeItem('admin_token');
+    mostrarTelaLogin();
+    document.getElementById('password').value = '';
+}
+
+// Função para fazer requisições autenticadas
+async function fetchAuth(url, options = {}) {
+    if (!authToken) {
+        throw new Error('Token de autenticação não encontrado');
+    }
+    
+    const headers = {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+        ...options.headers
+    };
+    
+    const response = await fetch(url, { ...options, headers });
+    
+    if (response.status === 401) {
+        logout();
+        throw new Error('Sessão expirada. Faça login novamente.');
+    }
+    
+    return response;
+}
 
 // Funções auxiliares
 function showTab(tab) {
@@ -94,7 +181,7 @@ function formatarData(isoString) {
 // Status do sistema
 async function carregarStatus() {
     try {
-        const response = await fetch(`${API_BASE}/health`);
+        const response = await fetchAuth(`${API_BASE}/health`);
         const data = await response.json();
         
         document.getElementById('status-text').textContent = 
@@ -112,7 +199,7 @@ async function carregarStatus() {
 
 async function carregarProdutos() {
     try {
-        const response = await fetch(`${API_BASE}/api/produtos`);
+        const response = await fetchAuth(`${API_BASE}/api/produtos`);
         produtos = await response.json();
         renderizarProdutos();
     } catch (error) {
@@ -151,7 +238,7 @@ function renderizarProdutos() {
 
 async function carregarUsuarios() {
     try {
-        const response = await fetch(`${API_BASE}/api/usuarios`);
+        const response = await fetchAuth(`${API_BASE}/api/usuarios`);
         const data = await response.json();
         usuarios = Object.values(data); // Converter objeto em array
         renderizarUsuarios();
@@ -211,9 +298,8 @@ async function togglePausado(numero, estaAtivo) {
     const novoStatusPausado = !estaAtivo;
     
     try {
-        const response = await fetch(`${API_BASE}/api/usuarios/${numero}`, {
+        const response = await fetchAuth(`${API_BASE}/api/usuarios/${numero}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pausado: novoStatusPausado })
         });
         
@@ -233,9 +319,8 @@ async function togglePausado(numero, estaAtivo) {
 
 async function toggleNotificacoes(numero, aceitaMensagens) {
     try {
-        const response = await fetch(`${API_BASE}/api/usuarios/${numero}`, {
+        const response = await fetchAuth(`${API_BASE}/api/usuarios/${numero}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ aceitaMensagens })
         });
         
@@ -259,7 +344,7 @@ async function removerUsuario(numero) {
     }
     
     try {
-        const response = await fetch(`${API_BASE}/api/usuarios/${numero}`, {
+        const response = await fetchAuth(`${API_BASE}/api/usuarios/${numero}`, {
             method: 'DELETE'
         });
         
@@ -291,7 +376,7 @@ async function limparHistorico(numero) {
     }
     
     try {
-        const response = await fetch(`${API_BASE}/api/usuarios/${numero}/historico`, {
+        const response = await fetchAuth(`${API_BASE}/api/usuarios/${numero}/historico`, {
             method: 'DELETE'
         });
         
@@ -375,7 +460,7 @@ async function removerProduto(id) {
     }
     
     try {
-        const response = await fetch(`${API_BASE}/api/produtos/${id}`, {
+        const response = await fetchAuth(`${API_BASE}/api/produtos/${id}`, {
             method: 'DELETE'
         });
         
@@ -411,7 +496,7 @@ window.onclick = function(event) {
 
 async function carregarConfiguracoes() {
     try {
-        const response = await fetch(`${API_BASE}/api/config`);
+        const response = await fetchAuth(`${API_BASE}/api/config`);
         const config = await response.json();
         
         document.getElementById('apiKey').value = config.ia?.apiKey || '';
@@ -451,9 +536,8 @@ async function salvarConfiguracoes() {
     }
 
     try {
-        const response = await fetch(`${API_BASE}/api/config`, {
+        const response = await fetchAuth(`${API_BASE}/api/config`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 apiKey, 
                 modelo, 

@@ -6,10 +6,30 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+
+// Middleware de autenticação para rotas admin
+function verificarAuth(req, res, next) {
+  const { authorization } = req.headers;
+  
+  if (req.path === '/admin' || req.path === '/admin/' || req.path === '/admin/index.html' || req.path === '/api/login') {
+    return next();
+  }
+  
+  if (req.path.startsWith('/admin/') || req.path.startsWith('/api/')) {
+    if (!authorization || authorization !== `Bearer ${ADMIN_PASSWORD}`) {
+      return res.status(401).json({ erro: 'Não autorizado' });
+    }
+  }
+  
+  next();
+}
+
+app.use(verificarAuth);
 app.use(express.static('public'));
 
 // --- Arquivos de Dados ---
@@ -444,6 +464,29 @@ app.post('/api/build-ai-payload', (req, res) => {
     payload: aiPayload,
     apiKey: config.ia.apiKey
   });
+});
+
+// =============================
+// ===== ROTAS DE AUTENTICAÇÃO =====
+// =============================
+
+// POST /api/login - Autenticar usuário
+app.post('/api/login', (req, res) => {
+  const { password } = req.body;
+  
+  if (!password) {
+    return res.status(400).json({ erro: 'Senha é obrigatória' });
+  }
+  
+  if (password === ADMIN_PASSWORD) {
+    res.json({ 
+      sucesso: true, 
+      token: ADMIN_PASSWORD,
+      mensagem: 'Login realizado com sucesso' 
+    });
+  } else {
+    res.status(401).json({ erro: 'Senha incorreta' });
+  }
 });
 
 // =============================
