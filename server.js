@@ -206,11 +206,17 @@ app.get('/api/usuarios/:numero', (req, res) => {
   const numero = req.params.numero;
   const { nome = 'Usuario' } = req.query;
 
+  console.log(`DEBUG: Buscando usuário: ${numero}`);
+  console.log(`DEBUG: Usuários no sistema: ${Object.keys(usuarios).length}`);
+  console.log(`DEBUG: Usuário existe? ${!!usuarios[numero]}`);
+
   if (usuarios[numero]) {
+    console.log(`DEBUG: Usuário encontrado com ${usuarios[numero].historico?.length || 0} mensagens no histórico`);
     usuarios[numero].ultimoContato = new Date().toISOString();
     salvarArquivo(USUARIOS_FILE, usuarios);
     res.json(usuarios[numero]);
   } else {
+    console.log(`DEBUG: Criando novo usuário: ${numero}`);
     const novoUsuario = {
       numero: numero,
       nome: nome,
@@ -440,6 +446,15 @@ app.post('/api/build-ai-payload', (req, res) => {
 
   const config = lerArquivo(CONFIG_FILE);
   const produtosList = lerArquivo(PRODUTOS_FILE);
+  
+  // Ler arquivo de treinamento
+  let treinamentoCompleto;
+  try {
+    treinamentoCompleto = fs.readFileSync('C:\\Users\\mat\\Documents\\fluxo n8n\\treinamento.txt', 'utf8');
+  } catch (error) {
+    console.log('DEBUG: Erro ao ler treinamento.txt, usando config.ia.treinamento');
+    treinamentoCompleto = config.ia.treinamento;
+  }
 
   // Construir lista de produtos formatada para a IA
   let produtosTexto = '\n--- ESTOQUE DE PRODUTOS ---\n';
@@ -452,7 +467,7 @@ app.post('/api/build-ai-payload', (req, res) => {
     });
   }
 
-  // Construir histórico formatado para o system message
+  // Construir histórico formatado no novo formato
   let historicoTexto = '';
   if (usuario.historico && usuario.historico.length > 0) {
     const limiteMensagens = config.historico?.limiteMensagens || 15;
@@ -462,7 +477,7 @@ app.post('/api/build-ai-payload', (req, res) => {
     
     historicoTexto = '\n\n--- HISTÓRICO DE CONVERSAS ---\n';
     historicoLimitado.forEach((msg, index) => {
-      const tipoRemetente = msg.remetente === 'user' ? 'CLIENTE' : 'ASSISTENTE';
+      const tipoRemetente = msg.remetente === 'user' ? 'Usuario' : 'Assistente';
       
       if (msg.timestamp) {
         try {
@@ -475,8 +490,8 @@ app.post('/api/build-ai-payload', (req, res) => {
             minute: '2-digit',
             timeZone: 'America/Manaus'
           });
-          historicoTexto += `[${dataFormatada}] ${tipoRemetente}: ${msg.mensagem}\n`;
-          console.log(`DEBUG: Mensagem ${index + 1} COM timestamp: [${dataFormatada}] ${tipoRemetente}: ${msg.mensagem.substring(0, 30)}...`);
+          historicoTexto += `${tipoRemetente}: ${msg.mensagem} (${dataFormatada})\n`;
+          console.log(`DEBUG: Mensagem ${index + 1} COM timestamp: ${tipoRemetente}: ${msg.mensagem.substring(0, 30)}... (${dataFormatada})`);
         } catch (error) {
           console.log(`DEBUG: Erro ao formatar timestamp: ${error.message}`);
           historicoTexto += `${tipoRemetente}: ${msg.mensagem}\n`;
@@ -487,14 +502,13 @@ app.post('/api/build-ai-payload', (req, res) => {
       }
     });
     
-    historicoTexto += '\n--- FIM DO HISTÓRICO ---\nAs mensagens acima são o histórico desta conversa. Use essas informações para dar continuidade natural à conversa e evitar repetir informações já mencionadas.';
     console.log(`DEBUG: Total de mensagens adicionadas ao histórico: ${historicoLimitado.length}`);
   } else {
     historicoTexto = '\n\n--- HISTÓRICO DE CONVERSAS ---\nEsta é a primeira interação com este cliente.';
     console.log('DEBUG: Nenhum histórico encontrado para este usuário');
   }
 
-  const systemMessage = config.ia.treinamento + produtosTexto + historicoTexto;
+  const systemMessage = treinamentoCompleto + produtosTexto + historicoTexto;
 
   // Construir array de mensagens (apenas system e mensagem atual)
   const messages = [{ role: "system", content: systemMessage }];
