@@ -452,25 +452,18 @@ app.post('/api/build-ai-payload', (req, res) => {
     });
   }
 
-  const systemMessage = config.ia.treinamento + produtosTexto + '\n\n--- HISTÓRICO DE CONVERSAS ---\nAs mensagens anteriores desta conversa estão incluídas no contexto para continuidade. Cada mensagem do histórico possui data e hora no formato [DD/MM/AAAA HH:MM] para referência temporal.';
-
-  // Construir array de mensagens com histórico
-  const messages = [{ role: "system", content: systemMessage }];
-
-  // Adicionar histórico de mensagens se existir
+  // Construir histórico formatado para o system message
+  let historicoTexto = '';
   if (usuario.historico && usuario.historico.length > 0) {
-    // Aplicar limite de mensagens do histórico conforme configuração
     const limiteMensagens = config.historico?.limiteMensagens || 15;
     const historicoLimitado = usuario.historico.slice(-limiteMensagens);
     
     console.log(`DEBUG: Histórico total: ${usuario.historico.length}, Limitado a: ${historicoLimitado.length}`);
     
-    // Adicionar apenas mensagens do histórico (sem a mensagem atual)
+    historicoTexto = '\n\n--- HISTÓRICO DE CONVERSAS ---\n';
     historicoLimitado.forEach((msg, index) => {
-      const role = msg.remetente === 'user' ? 'user' : 'assistant';
-      let content = msg.mensagem;
+      const tipoRemetente = msg.remetente === 'user' ? 'CLIENTE' : 'ASSISTENTE';
       
-      // Adicionar timestamp se disponível
       if (msg.timestamp) {
         try {
           const data = new Date(msg.timestamp);
@@ -482,24 +475,29 @@ app.post('/api/build-ai-payload', (req, res) => {
             minute: '2-digit',
             timeZone: 'America/Manaus'
           });
-          content = `[${dataFormatada}] ${msg.mensagem}`;
-          console.log(`DEBUG: Mensagem ${index + 1} COM timestamp: [${dataFormatada}] ${msg.mensagem.substring(0, 30)}...`);
+          historicoTexto += `[${dataFormatada}] ${tipoRemetente}: ${msg.mensagem}\n`;
+          console.log(`DEBUG: Mensagem ${index + 1} COM timestamp: [${dataFormatada}] ${tipoRemetente}: ${msg.mensagem.substring(0, 30)}...`);
         } catch (error) {
           console.log(`DEBUG: Erro ao formatar timestamp: ${error.message}`);
-          content = msg.mensagem;
+          historicoTexto += `${tipoRemetente}: ${msg.mensagem}\n`;
         }
       } else {
-        console.log(`DEBUG: Mensagem ${index + 1} SEM timestamp: ${msg.mensagem.substring(0, 30)}...`);
-        content = msg.mensagem;
+        console.log(`DEBUG: Mensagem ${index + 1} SEM timestamp: ${tipoRemetente}: ${msg.mensagem.substring(0, 30)}...`);
+        historicoTexto += `${tipoRemetente}: ${msg.mensagem}\n`;
       }
-      
-      messages.push({ role: role, content: content });
     });
     
-    console.log(`DEBUG: Total de mensagens adicionadas ao contexto: ${historicoLimitado.length}`);
+    historicoTexto += '\n--- FIM DO HISTÓRICO ---\nAs mensagens acima são o histórico desta conversa. Use essas informações para dar continuidade natural à conversa e evitar repetir informações já mencionadas.';
+    console.log(`DEBUG: Total de mensagens adicionadas ao histórico: ${historicoLimitado.length}`);
   } else {
+    historicoTexto = '\n\n--- HISTÓRICO DE CONVERSAS ---\nEsta é a primeira interação com este cliente.';
     console.log('DEBUG: Nenhum histórico encontrado para este usuário');
   }
+
+  const systemMessage = config.ia.treinamento + produtosTexto + historicoTexto;
+
+  // Construir array de mensagens (apenas system e mensagem atual)
+  const messages = [{ role: "system", content: systemMessage }];
 
   // Adicionar a mensagem atual do usuário
   messages.push({ role: "user", content: mensagem });
