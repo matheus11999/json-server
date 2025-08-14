@@ -437,10 +437,35 @@ app.post('/api/usuarios/:numero/historico', (req, res) => {
 app.post('/api/build-ai-payload', (req, res) => {
   const { produtos, usuario, mensagem } = req.body;
   
-  console.log(`DEBUG: Build AI Payload chamado para usuário: ${usuario.numero || 'N/A'}`);
-  console.log(`DEBUG: Histórico recebido: ${usuario.historico?.length || 0} mensagens`);
+  // Se usuario for um objeto com múltiplos usuários, extrair o primeiro
+  let usuarioAtivo;
+  console.log(`DEBUG: Estrutura do objeto usuario:`, JSON.stringify(usuario, null, 2));
   
-  if (!usuario || !mensagem) {
+  if (usuario && typeof usuario === 'object') {
+    if (usuario.numero) {
+      // É um usuário único
+      usuarioAtivo = usuario;
+      console.log(`DEBUG: Usuário único detectado: ${usuario.numero}`);
+    } else {
+      // É um objeto com múltiplos usuários, pegar o primeiro
+      const keys = Object.keys(usuario);
+      console.log(`DEBUG: Múltiplos usuários detectados. Chaves: ${keys.join(', ')}`);
+      if (keys.length > 0) {
+        usuarioAtivo = usuario[keys[0]];
+        console.log(`DEBUG: Usuário ativo selecionado: ${usuarioAtivo.numero}`);
+        console.log(`DEBUG: Histórico do usuário ativo: ${usuarioAtivo.historico?.length || 0} mensagens`);
+      } else {
+        return res.status(400).json({ erro: 'Nenhum usuário encontrado no objeto' });
+      }
+    }
+  } else {
+    return res.status(400).json({ erro: 'Usuário é obrigatório' });
+  }
+  
+  console.log(`DEBUG: Build AI Payload chamado para usuário: ${usuarioAtivo.numero || 'N/A'}`);
+  console.log(`DEBUG: Histórico recebido: ${usuarioAtivo.historico?.length || 0} mensagens`);
+  
+  if (!usuarioAtivo || !mensagem) {
     return res.status(400).json({ erro: 'Usuário e mensagem são obrigatórios' });
   }
 
@@ -469,11 +494,11 @@ app.post('/api/build-ai-payload', (req, res) => {
 
   // Construir histórico formatado no novo formato
   let historicoTexto = '';
-  if (usuario.historico && usuario.historico.length > 0) {
+  if (usuarioAtivo.historico && usuarioAtivo.historico.length > 0) {
     const limiteMensagens = config.historico?.limiteMensagens || 15;
-    const historicoLimitado = usuario.historico.slice(-limiteMensagens);
+    const historicoLimitado = usuarioAtivo.historico.slice(-limiteMensagens);
     
-    console.log(`DEBUG: Histórico total: ${usuario.historico.length}, Limitado a: ${historicoLimitado.length}`);
+    console.log(`DEBUG: Histórico total: ${usuarioAtivo.historico.length}, Limitado a: ${historicoLimitado.length}`);
     
     historicoTexto = '\n\n--- HISTÓRICO DE CONVERSAS ---\n';
     historicoLimitado.forEach((msg, index) => {
