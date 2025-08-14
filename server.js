@@ -435,7 +435,19 @@ app.post('/api/usuarios/:numero/historico', (req, res) => {
 
 // POST /api/build-ai-payload - Construir payload da IA usando configurações
 app.post('/api/build-ai-payload', (req, res) => {
-  const { produtos, usuario, mensagem } = req.body;
+  console.log('DEBUG: Dados recebidos:', req.body);
+  
+  // Processar dados que podem vir como JSON string ou objeto
+  let produtos, usuario, mensagem;
+  
+  try {
+    produtos = typeof req.body.produtos === 'string' ? JSON.parse(req.body.produtos) : req.body.produtos;
+    usuario = typeof req.body.usuario === 'string' ? JSON.parse(req.body.usuario) : req.body.usuario;
+    mensagem = req.body.mensagem;
+  } catch (error) {
+    console.log('DEBUG: Erro ao processar dados:', error.message);
+    return res.status(400).json({ erro: 'Dados inválidos no payload' });
+  }
   
   // Se usuario for um objeto com múltiplos usuários, extrair o primeiro
   let usuarioAtivo;
@@ -492,8 +504,11 @@ app.post('/api/build-ai-payload', (req, res) => {
     });
   }
 
-  // Construir histórico formatado no novo formato
+  // Construir histórico formatado integrado ao treinamento
   let historicoTexto = '';
+  console.log(`DEBUG: Verificando histórico - usuarioAtivo.historico existe: ${!!usuarioAtivo.historico}`);
+  console.log(`DEBUG: Verificando histórico - usuarioAtivo.historico.length: ${usuarioAtivo.historico?.length || 'undefined'}`);
+  
   if (usuarioAtivo.historico && usuarioAtivo.historico.length > 0) {
     const limiteMensagens = config.historico?.limiteMensagens || 15;
     const historicoLimitado = usuarioAtivo.historico.slice(-limiteMensagens);
@@ -533,6 +548,7 @@ app.post('/api/build-ai-payload', (req, res) => {
     console.log('DEBUG: Nenhum histórico encontrado para este usuário');
   }
 
+  // Integrar histórico diretamente no system content junto com produtos
   const systemMessage = treinamentoCompleto + produtosTexto + historicoTexto;
 
   // Construir array de mensagens (apenas system e mensagem atual)
