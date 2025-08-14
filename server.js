@@ -381,15 +381,22 @@ app.post('/api/usuarios/:numero/historico', (req, res) => {
     timestamp: new Date().toISOString()
   };
 
+  console.log(`DEBUG: Salvando mensagem com timestamp: ${novaMensagem.timestamp}`);
+
   usuarios[numero].historico.push(novaMensagem);
   usuarios[numero].ultimoContato = new Date().toISOString(); // Atualiza o último contato
 
   // Manter apenas as últimas N mensagens conforme configuração
   const config = lerArquivo(CONFIG_FILE);
   const limiteMensagens = config.historico?.limiteMensagens || 15;
+  console.log(`DEBUG: Histórico antes da limpeza: ${usuarios[numero].historico.length}, Limite: ${limiteMensagens}`);
+  
   while (usuarios[numero].historico.length > limiteMensagens) {
-    usuarios[numero].historico.shift();
+    const removida = usuarios[numero].historico.shift();
+    console.log(`DEBUG: Removendo mensagem antiga: ${removida.mensagem.substring(0, 30)}...`);
   }
+  
+  console.log(`DEBUG: Histórico após limpeza: ${usuarios[numero].historico.length}`)
 
   if (salvarArquivo(USUARIOS_FILE, usuarios)) {
     res.status(201).json(novaMensagem);
@@ -420,17 +427,50 @@ app.post('/api/build-ai-payload', (req, res) => {
     });
   }
 
-  const systemMessage = config.ia.treinamento + produtosTexto + '\n\n--- HISTÓRICO DE CONVERSAS ---\nAs mensagens anteriores desta conversa estão incluídas no contexto para continuidade.';
+  const systemMessage = config.ia.treinamento + produtosTexto + '\n\n--- HISTÓRICO DE CONVERSAS ---\nAs mensagens anteriores desta conversa estão incluídas no contexto para continuidade. Cada mensagem do histórico possui data e hora no formato [DD/MM/AAAA HH:MM] para referência temporal.';
 
   // Construir array de mensagens com histórico
   const messages = [{ role: "system", content: systemMessage }];
 
   // Adicionar histórico de mensagens se existir
   if (usuario.historico && usuario.historico.length > 0) {
-    usuario.historico.forEach(msg => {
+    // Aplicar limite de mensagens do histórico conforme configuração
+    const limiteMensagens = config.historico?.limiteMensagens || 15;
+    const historicoLimitado = usuario.historico.slice(-limiteMensagens);
+    
+    console.log(`DEBUG: Histórico total: ${usuario.historico.length}, Limitado a: ${historicoLimitado.length}`);
+    
+    historicoLimitado.forEach((msg, index) => {
       const role = msg.remetente === 'user' ? 'user' : 'assistant';
-      messages.push({ role: role, content: msg.mensagem });
+      let content = msg.mensagem;
+      
+      // Adicionar timestamp se disponível
+      if (msg.timestamp) {
+        try {
+          const data = new Date(msg.timestamp);
+          const dataFormatada = data.toLocaleString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit', 
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'America/Manaus'
+          });
+          content = `[${dataFormatada}] ${msg.mensagem}`;
+          console.log(`DEBUG: Mensagem ${index + 1} COM timestamp: [${dataFormatada}] ${msg.mensagem.substring(0, 50)}...`);
+        } catch (error) {
+          console.log(`DEBUG: Erro ao formatar timestamp: ${error.message}`);
+          content = msg.mensagem;
+        }
+      } else {
+        console.log(`DEBUG: Mensagem ${index + 1} SEM timestamp: ${msg.mensagem.substring(0, 50)}...`);
+        content = msg.mensagem;
+      }
+      
+      messages.push({ role: role, content: content });
     });
+  } else {
+    console.log('DEBUG: Nenhum histórico encontrado para este usuário');
   }
 
   // Adicionar a mensagem atual do usuário
