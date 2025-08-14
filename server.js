@@ -465,6 +465,7 @@ app.post('/api/build-ai-payload', (req, res) => {
     
     console.log(`DEBUG: Histórico total: ${usuario.historico.length}, Limitado a: ${historicoLimitado.length}`);
     
+    // Adicionar apenas mensagens do histórico (sem a mensagem atual)
     historicoLimitado.forEach((msg, index) => {
       const role = msg.remetente === 'user' ? 'user' : 'assistant';
       let content = msg.mensagem;
@@ -482,18 +483,20 @@ app.post('/api/build-ai-payload', (req, res) => {
             timeZone: 'America/Manaus'
           });
           content = `[${dataFormatada}] ${msg.mensagem}`;
-          console.log(`DEBUG: Mensagem ${index + 1} COM timestamp: [${dataFormatada}] ${msg.mensagem.substring(0, 50)}...`);
+          console.log(`DEBUG: Mensagem ${index + 1} COM timestamp: [${dataFormatada}] ${msg.mensagem.substring(0, 30)}...`);
         } catch (error) {
           console.log(`DEBUG: Erro ao formatar timestamp: ${error.message}`);
           content = msg.mensagem;
         }
       } else {
-        console.log(`DEBUG: Mensagem ${index + 1} SEM timestamp: ${msg.mensagem.substring(0, 50)}...`);
+        console.log(`DEBUG: Mensagem ${index + 1} SEM timestamp: ${msg.mensagem.substring(0, 30)}...`);
         content = msg.mensagem;
       }
       
       messages.push({ role: role, content: content });
     });
+    
+    console.log(`DEBUG: Total de mensagens adicionadas ao contexto: ${historicoLimitado.length}`);
   } else {
     console.log('DEBUG: Nenhum histórico encontrado para este usuário');
   }
