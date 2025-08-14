@@ -227,6 +227,28 @@ app.get('/api/usuarios/:numero', (req, res) => {
   }
 });
 
+// GET /api/usuarios/:numero/historico - Visualizar histórico do usuário (DEBUG)
+app.get('/api/usuarios/:numero/historico', (req, res) => {
+  const usuarios = lerArquivo(USUARIOS_FILE);
+  const numero = req.params.numero;
+
+  if (!usuarios[numero]) {
+    return res.json({ erro: 'Usuário não encontrado', historico: [] });
+  }
+
+  const usuario = usuarios[numero];
+  console.log(`DEBUG: Consultando histórico do usuário ${numero}`);
+  console.log(`DEBUG: Total de mensagens: ${usuario.historico?.length || 0}`);
+  
+  res.json({
+    numero: numero,
+    nome: usuario.nome,
+    totalMensagens: usuario.historico?.length || 0,
+    historico: usuario.historico || [],
+    ultimoContato: usuario.ultimoContato
+  });
+});
+
 // GET /api/usuarios/:numero/pode-responder - Verificar se pode responder para o usuário
 app.get('/api/usuarios/:numero/pode-responder', (req, res) => {
   const usuarios = lerArquivo(USUARIOS_FILE);
@@ -408,6 +430,9 @@ app.post('/api/usuarios/:numero/historico', (req, res) => {
 // POST /api/build-ai-payload - Construir payload da IA usando configurações
 app.post('/api/build-ai-payload', (req, res) => {
   const { produtos, usuario, mensagem } = req.body;
+  
+  console.log(`DEBUG: Build AI Payload chamado para usuário: ${usuario.numero || 'N/A'}`);
+  console.log(`DEBUG: Histórico recebido: ${usuario.historico?.length || 0} mensagens`);
   
   if (!usuario || !mensagem) {
     return res.status(400).json({ erro: 'Usuário e mensagem são obrigatórios' });
